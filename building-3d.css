@@ -1,0 +1,22 @@
+/* Perspective model, point survey and floating fabrication plans. */
+.model-scene.has-webgl{height:720px;overflow:hidden;margin-left:-45px;margin-right:-35px;min-height:0}
+.model-scene.has-webgl:before{inset:8% -10%;background:radial-gradient(ellipse at 50% 66%,#ffffff06,transparent 68%)}
+.model-scene.has-webgl #building-model{display:none}
+.model-scene:not(.has-webgl) .model-disciplines{display:none}
+.bim-canvas{position:absolute;inset:0;width:100%;height:calc(100% - 40px);max-width:none;touch-action:pan-y;cursor:grab;outline-offset:-3px}
+.bim-canvas.is-dragging{cursor:grabbing}
+.bim-canvas.is-over-tray{cursor:help}
+.has-webgl .scene-annotation{z-index:2;top:6%;right:3%;pointer-events:none}
+.has-webgl .scene-callout{bottom:18%;left:11%;z-index:2;pointer-events:none;font-size:10px}
+.has-webgl .model-controls{z-index:3;bottom:8%;left:0;right:0}
+.has-webgl .scene-reset{z-index:3;bottom:2%}
+.model-disciplines{display:flex;gap:2px;position:absolute;left:8%;top:6%;z-index:3;border:1px solid #333;border-radius:20px;padding:3px;background:#111e}
+.model-disciplines button{font-size:9px;padding:7px 11px;background:transparent;border-radius:16px;color:#aaa;line-height:1.3;min-height:30px}
+.model-disciplines button[aria-pressed=true]{background:#e31e24;color:#fff}
+.model-disciplines button:disabled{opacity:.35;cursor:default}
+.bim-floor-tag{position:absolute;z-index:2;font:7px monospace;letter-spacing:.05em;color:#bbb;white-space:nowrap;pointer-events:none;transform:translate(-95%,-50%);padding:4px 10px 4px 0;border-bottom:1px solid #8885}
+.bim-floor-tag:before{content:'';display:inline-block;width:3px;height:3px;background:#e31e24;margin-right:5px;vertical-align:middle}
+@media(max-width:1100px){.model-scene.has-webgl{height:650px;margin-left:-20px}.model-disciplines{left:2%;top:3%}.has-webgl .scene-annotation{top:10%}.has-webgl .scene-callout{left:6%}}
+@media(max-width:800px){.model-scene.has-webgl{height:580px;margin-left:0;margin-right:-15px}.model-disciplines{left:8%;top:3%}.has-webgl .scene-annotation{right:4%;top:13%}.has-webgl .model-controls{bottom:8%;left:0;right:0}.has-webgl .scene-callout{bottom:20%}}
+@media(max-width:540px){.model-scene.has-webgl{height:495px;margin:0 -16px -6px;padding:0;order:-1}.bim-canvas{height:calc(100% - 60px)}.model-disciplines{left:5%;top:12px;gap:0;padding:2px}.model-disciplines button{font-size:9px;padding:7px 11px;min-height:34px}.has-webgl .scene-annotation{right:6%;top:61px;font-size:6px}.has-webgl .scene-callout{left:9%;bottom:20%;font-size:8px;max-width:230px}.has-webgl .model-controls{left:0;right:0;bottom:6%;max-width:325px}.has-webgl .model-controls button{min-height:38px}.has-webgl .scene-reset{bottom:0;right:6%;font-size:8px}.bim-floor-tag{font-size:6px;transform:translate(-85%,-50%);padding-right:4px}}
+@media(pointer:coarse){.model-disciplines button{min-height:40px}.has-webgl .model-controls button{min-height:44px}}
