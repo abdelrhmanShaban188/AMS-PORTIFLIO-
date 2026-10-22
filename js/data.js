@@ -376,6 +376,7 @@ const portfolioData = {
             id: 12,
             category: "addin",
             title: "AMS Clash Live",
+            downloadUrl: "https://marketplace.autodesk.com/apps/9d344abb-aada-4dd3-b49c-bbd7a1ec26d0",
             details: "Provides live clash detection while modeling inside Revit. It alerts users when a clash occurs and maintains a clash schedule where issues can be reviewed and tracked based on their selected status.",
             images: [
                 "ADDIN/3.png"
