@@ -20,3 +20,9 @@
 @media(max-width:800px){.model-scene.has-webgl{height:580px;margin-left:0;margin-right:-15px}.model-disciplines{left:8%;top:3%}.has-webgl .scene-annotation{right:4%;top:13%}.has-webgl .model-controls{bottom:8%;left:0;right:0}.has-webgl .scene-callout{bottom:20%}}
 @media(max-width:540px){.model-scene.has-webgl{height:495px;margin:0 -16px -6px;padding:0;order:-1}.bim-canvas{height:calc(100% - 60px)}.model-disciplines{left:5%;top:12px;gap:0;padding:2px}.model-disciplines button{font-size:9px;padding:7px 11px;min-height:34px}.has-webgl .scene-annotation{right:6%;top:61px;font-size:6px}.has-webgl .scene-callout{left:9%;bottom:20%;font-size:8px;max-width:230px}.has-webgl .model-controls{left:0;right:0;bottom:6%;max-width:325px}.has-webgl .model-controls button{min-height:38px}.has-webgl .scene-reset{bottom:0;right:6%;font-size:8px}.bim-floor-tag{font-size:6px;transform:translate(-85%,-50%);padding-right:4px}}
 @media(pointer:coarse){.model-disciplines button{min-height:40px}.has-webgl .model-controls button{min-height:44px}}
+
+.coordination-view{position:absolute;z-index:4;left:8%;right:5%;top:15%;display:flex;align-items:center;gap:12px;flex-wrap:wrap;pointer-events:none}
+.coordination-view[hidden]{display:none}
+.coordination-view button{pointer-events:auto;border:1px solid #e31e24;border-radius:20px;background:#111e;color:#fff;padding:9px 14px;font-size:10px}
+.coordination-view span{font:9px monospace;color:#ddd;background:#111d;padding:6px 8px}
+@media(max-width:540px){.coordination-view{left:5%;top:85px;gap:5px}.coordination-view span{font-size:7px}.coordination-view button{min-height:40px}}
