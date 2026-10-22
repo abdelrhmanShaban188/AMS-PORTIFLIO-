@@ -1,6 +1,20 @@
 /* No framework, remote scripts or server required. All paths are repository-relative. */
 'use strict';
+// Support both the packaged assets layout and the original GitHub image folders.
+function recoverPortfolioImage(img){
+  if(!(img instanceof HTMLImageElement))return;
+  const src=img.getAttribute('src')||'';
+  const preview=src.match(/assets\/previews\/project-(\d+)\.webp/);
+  let next;
+  if(preview){
+    const project=portfolioData.projects.find(p=>p.id===Number(preview[1]));
+    if(project?.images?.[0])next='assets/images/'+project.images[0].split('/').map(encodeURIComponent).join('/');
+  }else if(src.startsWith('assets/images/'))next=src.slice('assets/images/'.length);
+  if(next&&next!==src)img.src=next;
+}
+document.addEventListener('error',event=>recoverPortfolioImage(event.target),true);
 document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('img').forEach(img=>{if(img.complete&&!img.naturalWidth)recoverPortfolioImage(img);});
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => [...document.querySelectorAll(s)];
   const escape = (s = '') => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

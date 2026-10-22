@@ -5,7 +5,7 @@ const portfolioBuilding3D = (() => {
     if(typeof THREE==='undefined')return null;
     const T=THREE, reduce=matchMedia('(prefers-reduced-motion:reduce)');
     const canvas=document.createElement('canvas');
-    canvas.className='bim-canvas';canvas.setAttribute('aria-label','Interactive three-dimensional building. Drag to orbit; use the tray list to inspect assets.');
+    canvas.className='bim-canvas';canvas.setAttribute('aria-label','Interactive three-dimensional building. Drag to orbit; use the asset list to inspect cable trays and lighting fixtures.');
     canvas.setAttribute('role','img');
     let renderer;
     try {renderer=new T.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'low-power'});}
@@ -15,13 +15,14 @@ const portfolioBuilding3D = (() => {
     renderer.outputColorSpace=T.SRGBColorSpace;
     const scene=new T.Scene();scene.fog=new T.FogExp2(0x0c0c0c,.006);
     const camera=new T.PerspectiveCamera(34,1,.1,260);
-    const building=new T.Group(),site=new T.Group(),drawings=new T.Group();
-    scene.add(site,building,drawings);
-    const state={lod:100,angle:34,exploded:false,trayProgress:1,selected:null,discipline:'all',playing:true,inspecting:false};
+    const building=new T.Group(),site=new T.Group();
+    scene.add(site,building);
+    const state={lod:100,angle:34,exploded:false,trayProgress:1,selected:null,discipline:'electrical',playing:true,inspecting:false,interior:false};
+    let interiorMix=0;
     let currentAngle=34,currentSpread=0,currentScale=.97,currentTarget=20;
     let active=true,frame=null,last=0,phase=0,dirtyUntil=0,drag=null,lastPointer=null,hovered=null;
     let lost=false,width=1,height=1,stageAge=0;
-    const levels=[],trays=[],picks=[],billboards=[];
+    const levels=[],trays=[],picks=[],lights=[],textures=[];
     const materials=[],geometries=[];
     const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
     const ease=x=>{x=clamp(x);return x*x*(3-2*x);};
@@ -103,13 +104,49 @@ const portfolioBuilding3D = (() => {
         box(mep,x,.8,-d*.22,.5,1.2,.26,fillMaterial(0x888888,.2),mepMat);
       }
       lines(mep,verticals,mepMat);
+      // Six ceiling luminaires per floor, fed from a distribution board.
+      for(let row=0;row<2;row++)for(let column=0;column<3;column++){
+        const x=(column-1)*w*.29,z=(row?1:-1)*d*.26;
+        addLight(mep,x,z,floor,row*3+column,w,d);
+      }
+      const mechanical=new T.Group();group.add(mechanical);
+      const ductMat=fillMaterial(0x888888,.55),ductEdge=lineMaterial(0xe31e24,.85);
+      box(mechanical,0,3.8,0,w*.95,.45,.65,ductMat,ductEdge);
+      box(mechanical,-w*.4,2.1,0,.7,3.6,.7,ductMat,ductEdge);
+      for(const x of [-w*.29,0,w*.29])for(const z of [-d*.43,d*.43]){
+        box(mechanical,x,3.8,z/2,.28,.28,Math.abs(z),ductMat,ductEdge);
+        box(mechanical,x,3.55,z,.85,.15,.85,ductMat,ductEdge);
+        lines(mechanical,[[x-.35,3.45,z-.35],[x+.35,3.45,z+.35],[x+.35,3.45,z-.35],[x-.35,3.45,z+.35]],ductEdge);
+      }
       const prefix='CT-L'+String(floor+1).padStart(2,'0')+'-';
       addTray(mep,[-w/2+1,4.35,-d/2+1.6],w-2,.5,'x',prefix+'01',floor);
       addTray(mep,[w/2-1,4.35,-d/2+1.6],d-3.2,.36,'z',prefix+'02',floor);
       addTray(mep,[-w/2+1,4.35,d/2-1.6],w-2,.72,'x',prefix+'03',floor);
       const tag=document.createElement('span');tag.className='bim-floor-tag';tag.setAttribute('aria-hidden','true');
       tag.textContent='L'+String(floor+1).padStart(2,'0')+' / ELECTRICAL';container.append(tag);
-      levels.push({group,w,d,floor,structure,facade,mep,frameMat,slabMat,facadeMat,glassMat,mepMat,fixtureMat,tag});
+      levels.push({group,w,d,floor,structure,facade,mep,mechanical,ductEdge,frameMat,slabMat,facadeMat,glassMat,mepMat,fixtureMat,tag});
+    }
+    function addLight(parent,x,z,floor,index,w,d){
+      const group=new T.Group();parent.add(group);
+      const routeMat=lineMaterial(0xe31e24,.8),edge=lineMaterial(0xcccccc,.8);
+      const housing=fillMaterial(0x888888,.7),diffuser=fillMaterial(0xffffff,.9);
+      const routePoints=[new T.Vector3(-w*.32,1.4,-d*.22),new T.Vector3(-w*.32,4.05,-d*.22),new T.Vector3(x,4.05,-d*.22),new T.Vector3(x,4.05,z),new T.Vector3(x,3.72,z)];
+      const curve=new T.CurvePath();for(let i=1;i<routePoints.length;i++)curve.add(new T.LineCurve3(routePoints[i-1],routePoints[i]));
+      const geometry=new T.BufferGeometry().setFromPoints(curve.getPoints(64));geometries.push(geometry);
+      const route=new T.Line(geometry,routeMat);group.add(route);
+      const tubeGeometry=new T.TubeGeometry(curve,40,.035,5,false);geometries.push(tubeGeometry);
+      const tube=new T.Mesh(tubeGeometry,routeMat.clone());materials.push(tube.material);group.add(tube);
+      const fitting=new T.Group();fitting.position.set(x,3.7,z);group.add(fitting);
+      box(fitting,0,0,0,1.5,.16,.65,housing,edge);
+      box(fitting,0,-.09,0,1.34,.025,.51,diffuser,null);
+      const glowMat=fillMaterial(0xffffff,.04);
+      const glowGeometry=new T.ConeGeometry(1.05,2.7,12,1,true);geometries.push(glowGeometry);
+      const glow=new T.Mesh(glowGeometry,glowMat);glow.position.set(0,-1.45,0);fitting.add(glow);
+      const id='LT-L'+String(floor+1).padStart(2,'0')+'-'+String(index+1).padStart(2,'0');
+      const hitGeometry=new T.BoxGeometry(1.7,.5,.85);geometries.push(hitGeometry);
+      const hitMat=new T.MeshBasicMaterial({visible:false});materials.push(hitMat);
+      const hit=new T.Mesh(hitGeometry,hitMat);hit.userData.trayId=id;fitting.add(hit);picks.push(hit);
+      lights.push({id,floor,index,group,route,tube,fitting,housing,diffuser,edge,glowMat});
     }
     function addTray(parent,start,length,w,axis,id,floor){
       const group=new T.Group();group.position.set(...start);parent.add(group);
@@ -129,21 +166,45 @@ const portfolioBuilding3D = (() => {
       const hit=new T.Mesh(pickGeometry,pickMaterial);hit.position.set(length/2,.1,0);hit.userData.trayId=id;group.add(hit);picks.push(hit);
       trays.push({id,floor,group,formed,material,edge,center,centerMaterial,length,rungs,rungCount});
     }
-    // Illustrative drawing planes appear beside the fabrication model.
-    const drawingTexture=makeDrawingTexture();
-    const drawingFill=new T.MeshBasicMaterial({map:drawingTexture,transparent:true,opacity:0,depthWrite:false,side:T.DoubleSide});materials.push(drawingFill);
-    for(let i=0;i<6;i++){
-      const plane=new T.Mesh(new T.PlaneGeometry(6.4,4.5),drawingFill);geometries.push(plane.geometry);
-      plane.position.set(15+(i%2)*6.3,8+Math.floor(i/2)*4.6,-1);drawings.add(plane);billboards.push(plane);
+    // Each floor owns a printed plan, so sheets follow assembly and orbit.
+    for(const level of levels){
+      const maps={};
+      for(const discipline of ['electrical','mechanical']){
+        maps[discipline]=makeDrawingTexture(level.floor,discipline);textures.push(maps[discipline]);
+      }
+      const material=new T.MeshBasicMaterial({map:maps.electrical,transparent:true,opacity:.92,side:T.DoubleSide,depthWrite:false});materials.push(material);
+      const geometry=new T.PlaneGeometry(level.w+2.4,level.d+3.4);geometries.push(geometry);
+      const sheet=new T.Mesh(geometry,material);sheet.rotation.x=-Math.PI/2;sheet.position.y=.34;
+      level.group.add(sheet);Object.assign(level,{sheet,sheetMaterial:material,sheetMaps:maps});
     }
-    function makeDrawingTexture(){
-      const c=document.createElement('canvas');c.width=440;c.height=300;const ctx=c.getContext('2d');
-      ctx.fillStyle='#111111';ctx.fillRect(0,0,440,300);ctx.strokeStyle='#e31e24';ctx.lineWidth=2;ctx.strokeRect(3,3,434,294);
-      ctx.strokeStyle='#888888';ctx.lineWidth=1;ctx.strokeRect(35,37,370,200);
-      for(const x of [35,125,215,305,405]){ctx.beginPath();ctx.moveTo(x,37);ctx.lineTo(x,237);ctx.stroke();}
-      for(const y of [37,105,172,237]){ctx.beginPath();ctx.moveTo(35,y);ctx.lineTo(405,y);ctx.stroke();}
-      ctx.strokeStyle='#e31e24';ctx.beginPath();ctx.moveTo(55,65);ctx.lineTo(380,65);ctx.lineTo(380,210);ctx.lineTo(55,210);ctx.stroke();
-      ctx.fillStyle='#bbbbbb';ctx.font='13px monospace';ctx.fillText('ELECTRICAL / ILLUSTRATIVE PLAN',22,275);
+    function makeDrawingTexture(floor,discipline){
+      const c=document.createElement('canvas');c.width=1024;c.height=768;const ctx=c.getContext('2d');
+      const electrical=discipline==='electrical',number=String(floor+1).padStart(2,'0');
+      ctx.fillStyle='#dddddd';ctx.fillRect(0,0,1024,768);
+      ctx.strokeStyle='#111111';ctx.lineWidth=3;ctx.strokeRect(18,18,988,732);
+      ctx.strokeRect(70,85,870,520);ctx.lineWidth=1;ctx.strokeStyle='#888888';
+      for(const x of [70,360,650,940]){ctx.beginPath();ctx.moveTo(x,85);ctx.lineTo(x,605);ctx.stroke();}
+      for(const y of [85,345,605]){ctx.beginPath();ctx.moveTo(70,y);ctx.lineTo(940,y);ctx.stroke();}
+      ctx.strokeStyle='#111111';ctx.lineWidth=3;ctx.strokeRect(420,265,160,145);
+      ctx.fillStyle='#111111';ctx.font='20px monospace';ctx.fillText('CORE',470,345);
+      ctx.fillText('N',950,62);ctx.beginPath();ctx.moveTo(965,100);ctx.lineTo(965,70);ctx.lineTo(957,80);ctx.stroke();
+      ctx.strokeStyle='#e31e24';ctx.lineWidth=4;
+      ctx.beginPath();ctx.moveTo(115,520);ctx.lineTo(115,130);ctx.lineTo(895,130);ctx.lineTo(895,550);ctx.stroke();
+      if(!electrical){ctx.strokeRect(140,327,725,28);}
+      for(const x of [230,505,780])for(const y of [210,485]){
+        ctx.strokeStyle='#e31e24';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,electrical?130:341);ctx.lineTo(x,y);ctx.stroke();
+        ctx.strokeStyle='#111111';ctx.lineWidth=3;
+        if(electrical){ctx.strokeRect(x-36,y-14,72,28);ctx.beginPath();ctx.moveTo(x-32,y-11);ctx.lineTo(x+32,y+11);ctx.moveTo(x+32,y-11);ctx.lineTo(x-32,y+11);ctx.stroke();}
+        else {ctx.strokeRect(x-25,y-25,50,50);ctx.strokeRect(x-15,y-15,30,30);ctx.beginPath();ctx.moveTo(x-25,y-25);ctx.lineTo(x+25,y+25);ctx.moveTo(x+25,y-25);ctx.lineTo(x-25,y+25);ctx.stroke();}
+        ctx.font='16px monospace';ctx.fillStyle='#111111';ctx.fillText(electrical?'LT / 36W':'SA / DIFF',x-38,y+48);
+      }
+      ctx.strokeStyle='#111111';ctx.strokeRect(87,505,56,64);ctx.fillStyle='#111111';ctx.font='17px monospace';ctx.fillText(electrical?'DB':'AHU',94,543);
+      ctx.strokeRect(18,635,988,115);ctx.beginPath();ctx.moveTo(730,635);ctx.lineTo(730,750);ctx.stroke();
+      ctx.font='bold 26px monospace';ctx.fillText(discipline.toUpperCase()+' / LEVEL '+number,40,675);
+      ctx.font='18px monospace';ctx.fillText(electrical?'LIGHTING + CONTAINMENT PLAN':'HVAC + AIR DISTRIBUTION PLAN',40,708);
+      ctx.font='14px monospace';ctx.fillText('ILLUSTRATIVE SYMBOLS / NOT FOR CONSTRUCTION',40,735);
+      ctx.font='bold 22px monospace';ctx.fillText((electrical?'E':'M')+'-L'+number+'-400',755,675);
+      ctx.font='17px monospace';ctx.fillText('REV 00 / NTS',755,710);
       const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;return texture;
     }
     const scan=new T.Group();building.add(scan);
@@ -159,13 +220,17 @@ const portfolioBuilding3D = (() => {
       currentTarget+=((state.exploded?26:20)-currentTarget)*damp;
       currentScale+=((state.lod===100?.94:1)-currentScale)*damp;building.scale.setScalar(currentScale);
       concept.visible=state.lod===100;
-      const structureFactor=state.discipline==='all'||state.discipline==='structure'?1:.26;
-      const architectureFactor=state.discipline==='all'||state.discipline==='architecture'?1:.07;
-      const electricalFactor=state.discipline==='all'||state.discipline==='electrical'?1:.1;
+      const coordination=state.lod===350;
+      const inside=coordination&&state.interior;
+      interiorMix+=(Number(inside)-interiorMix)*(reduce.matches?1:1-Math.exp(-dt*3.2));
+      site.visible=interiorMix<.9;
+      const structureFactor=inside?.65:.26;
+      const architectureFactor=.07;
+      const electricalFactor=state.discipline==='electrical'||coordination?1:0;
       for(const level of levels){
         const f=level.floor;
         const growth=state.lod===200&&state.playing&&!reduce.matches?ease((stageAge-f*.13)/.85):1;
-        level.group.visible=state.lod>=200&&growth>.001;
+        level.group.visible=state.lod>=200&&growth>.001&&(interiorMix<.9||f===2);
         level.group.position.set(Math.sin(f*1.25)*currentSpread*1.25,4.4+f*(5+currentSpread*2.2),Math.cos(f*1.25)*currentSpread*.6);
         level.group.scale.y=.015+growth*.985;
         level.frameMat.opacity=.57*structureFactor;
@@ -174,7 +239,15 @@ const portfolioBuilding3D = (() => {
         const facadeReveal=state.lod===300&&state.playing&&!reduce.matches?ease(stageAge/.8):1;
         level.facadeMat.opacity=(state.lod>=350?.34:.42)*architectureFactor*facadeReveal;
         level.glassMat.opacity=(state.lod>=350?.018:.045)*architectureFactor*facadeReveal;
-        level.mep.visible=state.lod>=300;
+        level.mep.visible=state.lod>=300&&(state.discipline==='electrical'||coordination);
+        level.mechanical.visible=state.lod>=300&&(state.discipline==='mechanical'||coordination);
+        level.ductEdge.color.setHex(coordination?0xdddddd:0xe31e24);
+        const mechGrowth=state.lod===300&&state.playing&&!reduce.matches?ease((stageAge-f*.12)/1.1):1;
+        level.mechanical.scale.set(Math.max(.001,mechGrowth),1,Math.max(.001,mechGrowth));
+        level.sheet.visible=state.lod===400;
+        level.sheetMaterial.map=level.sheetMaps[state.discipline];
+        level.sheetMaterial.opacity=.92*(state.playing&&!reduce.matches?ease((stageAge-f*.1)/.7):1);
+        level.tag.textContent='L'+String(f+1).padStart(2,'0')+' / '+state.discipline.toUpperCase();
         level.mepMat.opacity=(state.lod>=350?.64:.25)*electricalFactor;
         level.fixtureMat.opacity=(state.lod>=350?.8:.35)*electricalFactor;
         level.tag.hidden=!(currentSpread>.6&&state.lod>=350&&f%2===1);
@@ -189,7 +262,7 @@ const portfolioBuilding3D = (() => {
         tray.group.visible=state.lod>=350;
         tray.center.geometry.attributes.position.setX(1,tray.length*draw);tray.center.geometry.attributes.position.needsUpdate=true;
         tray.centerMaterial.opacity=.8*electricalFactor;
-        tray.formed.visible=state.lod>=400&&form>.001;
+        tray.formed.visible=state.lod>=350&&form>.001;
         tray.formed.scale.set(1,Math.max(.01,form),1);
         const selected=state.selected===tray.id;
         tray.material.color.setHex(selected?0xffffff:0xe31e24);
@@ -198,17 +271,44 @@ const portfolioBuilding3D = (() => {
         tray.edge.opacity=form*(selected?1:.45)*electricalFactor;
         tray.rungs.count=Math.floor(tray.rungCount*detail);
       }
-      drawings.visible=state.lod===400&&state.discipline!=='structure';
-      drawingFill.opacity=.95*(state.playing&&!reduce.matches?ease(stageAge/.65):1);
+      for(const light of lights){
+        const progress=state.lod>=350?1:state.lod===300?(state.playing&&!reduce.matches?clamp((stageAge-light.floor*.12-light.index*.09)/1.1):1):0;
+        light.group.visible=state.lod>=300;
+        light.route.geometry.setDrawRange(0,Math.floor(light.route.geometry.attributes.position.count*clamp(progress/.55)));
+        const form=ease((progress-.45)/.55);
+        light.fitting.visible=form>.001;light.fitting.scale.setScalar(Math.max(.001,form));
+        light.tube.visible=state.lod>=400||coordination;
+        light.route.material.opacity=.7*electricalFactor;light.tube.material.opacity=.75*electricalFactor;
+        const selected=state.selected===light.id;
+        light.edge.color.setHex(selected?0xe31e24:0xcccccc);
+        light.housing.opacity=.65*electricalFactor;
+        light.edge.opacity=.9*electricalFactor;
+        light.diffuser.opacity=(selected?1:.85)*electricalFactor;
+        light.glowMat.opacity=(state.lod>=350?.035:0)*electricalFactor*form;
+      }
+      container.dataset.lightingFixtures=String(lights.length);
+      container.dataset.floorSheets=String(state.lod===400?6:0);
+      container.dataset.modelDiscipline=state.discipline;
       scan.visible=state.playing&&!state.inspecting&&!reduce.matches;
       scan.position.y=3+(phase%7)/7*(state.exploded?46:32);
       scanMaterial.opacity=.12+Math.sin(phase*1.2)*.055;
       pointMaterial.opacity=.56+(state.playing&&!reduce.matches?Math.sin(phase*.35)*.04:0);
       const distance=(87+18*currentSpread)*(width<440?1.09:1);
-      const yaw=currentAngle*Math.PI/180,elevation=width<440?.18:.21;
-      camera.position.set(Math.sin(yaw)*distance,currentTarget+distance*elevation,Math.cos(yaw)*distance);
-      camera.lookAt(0,currentTarget,0);camera.updateMatrixWorld();
-      billboards.forEach((p,i)=>{const offset=15.2+(i%2)*7.3;p.position.set(Math.cos(yaw)*offset,9.8+Math.floor(i/2)*5.2,-Math.sin(yaw)*offset);p.quaternion.copy(camera.quaternion);});
+      const yaw=currentAngle*Math.PI/180,elevation=state.lod===400?.52:width<440?.18:.21;
+      // Walk beneath the Level 03 service zone while keeping both disciplines visible.
+      building.updateMatrixWorld(true);
+      const floor=levels[2];
+      const walk=state.playing&&!reduce.matches?Math.sin(stageAge*.28):0;
+      const innerPosition=new T.Vector3(-floor.w*.34+walk*.9,1.9,floor.d*.39).applyMatrix4(floor.group.matrixWorld);
+      const lookOffset=Math.sin((currentAngle-34)*Math.PI/180)*2;
+      const innerTarget=new T.Vector3(lookOffset,3.95,-floor.d*.18).applyMatrix4(floor.group.matrixWorld);
+      const outerPosition=new T.Vector3(Math.sin(yaw)*distance,currentTarget+distance*elevation,Math.cos(yaw)*distance);
+      camera.position.copy(outerPosition.lerp(innerPosition,interiorMix));
+      const target=new T.Vector3(0,currentTarget,0).lerp(innerTarget,interiorMix);
+      camera.fov=34+interiorMix*32;camera.updateProjectionMatrix();
+      camera.lookAt(target);camera.updateMatrixWorld();
+      container.dataset.cameraView=inside?'interior':'exterior';
+      container.dataset.coordination=String(coordination);
       // Update matrices before raycasting or projecting tags after a package move.
       building.updateMatrixWorld(true);
       container.dataset.cameraAngle=((currentAngle%360+360)%360).toFixed(1);
@@ -225,7 +325,7 @@ const portfolioBuilding3D = (() => {
     }
     function requestDraw(){dirtyUntil=performance.now()+1300;if(active&&frame===null)frame=requestAnimationFrame(tick);}
     function pick(x,y){
-      if(state.lod!==500||state.discipline==='structure'||state.discipline==='architecture')return null;
+      if(state.lod!==500||state.discipline!=='electrical')return null;
       const rect=canvas.getBoundingClientRect();mouse.set((x-rect.left)/rect.width*2-1,-(y-rect.top)/rect.height*2+1);
       scene.updateMatrixWorld(true);raycaster.setFromCamera(mouse,camera);
       return raycaster.intersectObjects(picks,false)[0]?.object.userData.trayId||null;
@@ -268,7 +368,7 @@ const portfolioBuilding3D = (() => {
     function setState(next){if(next.lod!==undefined&&next.lod!==state.lod)stageAge=0;Object.assign(state,next);requestDraw();}
     function setActive(value){active=value;if(value)requestDraw();else{cancelAnimationFrame(frame);frame=null;}}
     requestDraw();
-    return {setState,setActive,dispose(){resize.disconnect();cancelAnimationFrame(frame);renderer.dispose();materials.forEach(m=>m.dispose());geometries.forEach(g=>g.dispose());drawingTexture.dispose();levels.forEach(l=>l.tag.remove());canvas.remove();container.classList.remove('has-webgl');}};
+    return {setState,setActive,dispose(){resize.disconnect();cancelAnimationFrame(frame);renderer.dispose();materials.forEach(m=>m.dispose());geometries.forEach(g=>g.dispose());textures.forEach(t=>t.dispose());levels.forEach(l=>l.tag.remove());canvas.remove();container.classList.remove('has-webgl');}};
   }
   return {create};
 })();

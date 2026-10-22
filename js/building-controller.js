@@ -5,9 +5,11 @@ const portfolioModelController = (() => {
     const $=s=>root.querySelector(s),$$=s=>[...root.querySelectorAll(s)];
     const scene=$('#model-scene'),model=$('#building-model'),tip=$('#tray-tooltip');
     const reducedMotion=window.matchMedia('(prefers-reduced-motion:reduce)');
-    const assets=new Map(portfolioTrayData.assets.map(asset=>[asset.id,asset]));
-    const duration={100:1800,200:2000,300:2300,350:3400,400:4200,500:7500};
-    let angle=34,lod=100,cycle=0,pointer=null,renderFrame=null,world=null,discipline='all';
+    const assetList=[...portfolioTrayData.assets,...(portfolioTrayData.lights||[])];
+    const assets=new Map(assetList.map(asset=>[asset.id,asset]));
+    const duration={100:1800,200:2000,300:2300,350:11000,400:4200,500:7500};
+    let interior=false;
+    let angle=34,lod=100,cycle=0,pointer=null,renderFrame=null,world=null,discipline='electrical';
     let visible=true,orbit=!reducedMotion.matches,orbitFrame=null,orbitLast=0;
     let enabled=!reducedMotion.matches,timer=null,deadline=0,remaining=duration[100];
     let trayProgress=1,trayFrame=null,trayLast=null,trayPaint=0;
@@ -30,7 +32,7 @@ const portfolioModelController = (() => {
       $('#building-content').innerHTML=portfolioVisualization.render(angle,lod,{trayProgress,selectedTrayId:selected});
       $('#model-angle').textContent=Math.round(angle)+'°';
       scene.dataset.trayProgress=trayProgress.toFixed(2);
-      world?.setState({angle,lod,trayProgress,exploded:scene.dataset.exploded==='true',selected,discipline});
+      world?.setState({angle,lod,trayProgress,exploded:scene.dataset.exploded==='true',selected,discipline,interior});
       if(transition&&!reducedMotion.matches){
         $('#building-content').animate([{opacity:.35,transform:'translateY(10px)'},{opacity:1,transform:'translateY(0)'}],{duration:500});
         $$('#building-content .model-floor').forEach((floor,index)=>{
@@ -106,11 +108,16 @@ const portfolioModelController = (() => {
       $('#scene-label').textContent='LOD '+lod+' / '+description[0].toUpperCase();
       $('#scene-caption').setAttribute('aria-live',automatic?'off':'polite');
       $('#scene-caption').innerHTML=description[0]+'<small>LOD '+lod+' / ILLUSTRATIVE PROGRESSION</small>';
-      $('#lod-description').textContent=description[1];
+      $('#lod-description').textContent=lod===400?'Each floor becomes a drawing sheet with discipline symbols and a title block.':description[1];
       $$('.stage-dock button').forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.lod)===lod)));
-      $('#model-explode').disabled=lod<200;setExploded(lod===350||lod===400);
+      interior=lod===350&&Boolean(world);
+      $('#coordination-view').hidden=lod!==350||!world;
+      $('#model-interior').setAttribute('aria-pressed',String(interior));
+      $('#model-interior').textContent=interior?'Outside view':'Enter building';
+      $('#model-explode').disabled=lod<200||interior;setExploded(lod===400);
+      if(lod===350)$('#lod-description').textContent='Walk inside Level 03: cable trays pass above HVAC ducts. Illustrative coordination geometry.';
       $$('#model-disciplines button').forEach(button=>{button.disabled=lod<200;});
-      $('#tray-access').hidden=lod!==500;
+      $('#tray-access').hidden=lod!==500||discipline!=='electrical';
       cancelAnimationFrame(trayFrame);trayFrame=null;trayLast=null;
       trayProgress=enabled&&!reducedMotion.matches&&(lod===350||lod===400)?0:1;
       render(true);remaining=duration[lod];resumeActivity();
@@ -130,13 +137,13 @@ const portfolioModelController = (() => {
       if(pinned&&selected!==id&&!pin)return;
       clearTimeout(hideTimer);selected=id;pinned=pinned||pin;suspendActivity();
       const asset=assets.get(id);$('#tray-tooltip-title').textContent=id;
-      const rows=[['Type',asset.type],['Size',asset.widthMm+' × '+asset.heightMm+' mm'],['Length',asset.lengthMm+' mm'],['Manufacturer',asset.manufacturer],['Material',asset.material],['Thickness',asset.thicknessMm+' mm'],['System',asset.system],['Location',asset.level]];
+      const rows=[['Type',asset.type],['Size',asset.widthMm+' × '+asset.heightMm+' mm'],['Length',asset.lengthMm+' mm'],['Manufacturer',asset.manufacturer],['Material',asset.material],...(asset.powerW?[['Power',asset.powerW+' W'],['Colour temperature',asset.cctK+' K']]:[['Thickness',asset.thicknessMm+' mm']]),['System',asset.system],['Location',asset.level]];
       const dl=$('#tray-tooltip-data');dl.replaceChildren();
       rows.forEach(([label,value])=>{const row=document.createElement('div'),dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;row.append(dt,dd);dl.append(row);});
       tip.hidden=false;$('#tray-select').value=id;highlight();status();world?.setActive(true);positionTip(x,y);
     }
     function delayedClose(){if(!pinned)hideTimer=setTimeout(()=>closeInspector(),240);}
-    portfolioTrayData.assets.forEach(asset=>{
+    assetList.forEach(asset=>{
       const option=document.createElement('option');option.value=asset.id;
       option.textContent=asset.id+' · '+asset.widthMm+' × '+asset.heightMm+' mm';
       $('#tray-select').append(option);
@@ -174,12 +181,20 @@ const portfolioModelController = (() => {
     $$('.stage-dock button').forEach(button=>button.addEventListener('click',()=>chooseLOD(button.dataset.lod)));
     $('#rotate-left').addEventListener('click',()=>{setOrbit(false);setAngle(angle-15);});
     $('#rotate-right').addEventListener('click',()=>{setOrbit(false);setAngle(angle+15);});
+    $('#model-interior').addEventListener('click',()=>{
+      interior=!interior;$('#model-interior').setAttribute('aria-pressed',String(interior));
+      $('#model-interior').textContent=interior?'Outside view':'Enter building';
+      $('#model-explode').disabled=interior;
+      if(interior)setExploded(false);
+      world?.setState({interior});
+    });
     $('#model-explode').addEventListener('click',()=>setExploded(scene.dataset.exploded!=='true'));
     $('#scene-reset').addEventListener('click',()=>{setOrbit(false);setAngle(34);chooseLOD(100);});
     $$('#model-disciplines button').forEach(button=>button.addEventListener('click',()=>{
       closeInspector();discipline=button.dataset.discipline;
       $$('#model-disciplines button').forEach(peer=>peer.setAttribute('aria-pressed',String(peer===button)));
       scene.dataset.discipline=discipline;world?.setState({discipline});
+      $('#tray-access').hidden=lod!==500||discipline!=='electrical';
     }));
     model.addEventListener('pointerdown',event=>{
       if(event.button!==0||event.target.closest('.tray-hit'))return;
