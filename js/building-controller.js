@@ -7,7 +7,8 @@ const portfolioModelController = (() => {
     const reducedMotion=window.matchMedia('(prefers-reduced-motion:reduce)');
     const assetList=[...portfolioTrayData.assets,...(portfolioTrayData.lights||[])];
     const assets=new Map(assetList.map(asset=>[asset.id,asset]));
-    const duration={100:1800,200:2000,300:2300,350:3400,400:4200,500:7500};
+    const duration={100:1800,200:2000,300:2300,350:11000,400:4200,500:7500};
+    let interior=false;
     let angle=34,lod=100,cycle=0,pointer=null,renderFrame=null,world=null,discipline='electrical';
     let visible=true,orbit=!reducedMotion.matches,orbitFrame=null,orbitLast=0;
     let enabled=!reducedMotion.matches,timer=null,deadline=0,remaining=duration[100];
@@ -31,7 +32,7 @@ const portfolioModelController = (() => {
       $('#building-content').innerHTML=portfolioVisualization.render(angle,lod,{trayProgress,selectedTrayId:selected});
       $('#model-angle').textContent=Math.round(angle)+'°';
       scene.dataset.trayProgress=trayProgress.toFixed(2);
-      world?.setState({angle,lod,trayProgress,exploded:scene.dataset.exploded==='true',selected,discipline});
+      world?.setState({angle,lod,trayProgress,exploded:scene.dataset.exploded==='true',selected,discipline,interior});
       if(transition&&!reducedMotion.matches){
         $('#building-content').animate([{opacity:.35,transform:'translateY(10px)'},{opacity:1,transform:'translateY(0)'}],{duration:500});
         $$('#building-content .model-floor').forEach((floor,index)=>{
@@ -109,7 +110,12 @@ const portfolioModelController = (() => {
       $('#scene-caption').innerHTML=description[0]+'<small>LOD '+lod+' / ILLUSTRATIVE PROGRESSION</small>';
       $('#lod-description').textContent=lod===400?'Each floor becomes a drawing sheet with discipline symbols and a title block.':description[1];
       $$('.stage-dock button').forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.lod)===lod)));
-      $('#model-explode').disabled=lod<200;setExploded(lod===350||lod===400);
+      interior=lod===350&&Boolean(world);
+      $('#coordination-view').hidden=lod!==350||!world;
+      $('#model-interior').setAttribute('aria-pressed',String(interior));
+      $('#model-interior').textContent=interior?'Outside view':'Enter building';
+      $('#model-explode').disabled=lod<200||interior;setExploded(lod===400);
+      if(lod===350)$('#lod-description').textContent='Walk inside Level 03: cable trays pass above HVAC ducts. Illustrative coordination geometry.';
       $$('#model-disciplines button').forEach(button=>{button.disabled=lod<200;});
       $('#tray-access').hidden=lod!==500||discipline!=='electrical';
       cancelAnimationFrame(trayFrame);trayFrame=null;trayLast=null;
@@ -175,6 +181,13 @@ const portfolioModelController = (() => {
     $$('.stage-dock button').forEach(button=>button.addEventListener('click',()=>chooseLOD(button.dataset.lod)));
     $('#rotate-left').addEventListener('click',()=>{setOrbit(false);setAngle(angle-15);});
     $('#rotate-right').addEventListener('click',()=>{setOrbit(false);setAngle(angle+15);});
+    $('#model-interior').addEventListener('click',()=>{
+      interior=!interior;$('#model-interior').setAttribute('aria-pressed',String(interior));
+      $('#model-interior').textContent=interior?'Outside view':'Enter building';
+      $('#model-explode').disabled=interior;
+      if(interior)setExploded(false);
+      world?.setState({interior});
+    });
     $('#model-explode').addEventListener('click',()=>setExploded(scene.dataset.exploded!=='true'));
     $('#scene-reset').addEventListener('click',()=>{setOrbit(false);setAngle(34);chooseLOD(100);});
     $$('#model-disciplines button').forEach(button=>button.addEventListener('click',()=>{

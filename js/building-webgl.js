@@ -17,7 +17,8 @@ const portfolioBuilding3D = (() => {
     const camera=new T.PerspectiveCamera(34,1,.1,260);
     const building=new T.Group(),site=new T.Group();
     scene.add(site,building);
-    const state={lod:100,angle:34,exploded:false,trayProgress:1,selected:null,discipline:'electrical',playing:true,inspecting:false};
+    const state={lod:100,angle:34,exploded:false,trayProgress:1,selected:null,discipline:'electrical',playing:true,inspecting:false,interior:false};
+    let interiorMix=0;
     let currentAngle=34,currentSpread=0,currentScale=.97,currentTarget=20;
     let active=true,frame=null,last=0,phase=0,dirtyUntil=0,drag=null,lastPointer=null,hovered=null;
     let lost=false,width=1,height=1,stageAge=0;
@@ -110,9 +111,9 @@ const portfolioBuilding3D = (() => {
       }
       const mechanical=new T.Group();group.add(mechanical);
       const ductMat=fillMaterial(0x888888,.55),ductEdge=lineMaterial(0xe31e24,.85);
-      box(mechanical,0,3.8,0,w*.8,.45,.65,ductMat,ductEdge);
+      box(mechanical,0,3.8,0,w*.95,.45,.65,ductMat,ductEdge);
       box(mechanical,-w*.4,2.1,0,.7,3.6,.7,ductMat,ductEdge);
-      for(const x of [-w*.29,0,w*.29])for(const z of [-d*.26,d*.26]){
+      for(const x of [-w*.29,0,w*.29])for(const z of [-d*.43,d*.43]){
         box(mechanical,x,3.8,z/2,.28,.28,Math.abs(z),ductMat,ductEdge);
         box(mechanical,x,3.55,z,.85,.15,.85,ductMat,ductEdge);
         lines(mechanical,[[x-.35,3.45,z-.35],[x+.35,3.45,z+.35],[x+.35,3.45,z-.35],[x-.35,3.45,z+.35]],ductEdge);
@@ -123,7 +124,7 @@ const portfolioBuilding3D = (() => {
       addTray(mep,[-w/2+1,4.35,d/2-1.6],w-2,.72,'x',prefix+'03',floor);
       const tag=document.createElement('span');tag.className='bim-floor-tag';tag.setAttribute('aria-hidden','true');
       tag.textContent='L'+String(floor+1).padStart(2,'0')+' / ELECTRICAL';container.append(tag);
-      levels.push({group,w,d,floor,structure,facade,mep,mechanical,frameMat,slabMat,facadeMat,glassMat,mepMat,fixtureMat,tag});
+      levels.push({group,w,d,floor,structure,facade,mep,mechanical,ductEdge,frameMat,slabMat,facadeMat,glassMat,mepMat,fixtureMat,tag});
     }
     function addLight(parent,x,z,floor,index,w,d){
       const group=new T.Group();parent.add(group);
@@ -219,13 +220,17 @@ const portfolioBuilding3D = (() => {
       currentTarget+=((state.exploded?26:20)-currentTarget)*damp;
       currentScale+=((state.lod===100?.94:1)-currentScale)*damp;building.scale.setScalar(currentScale);
       concept.visible=state.lod===100;
-      const structureFactor=.26;
+      const coordination=state.lod===350;
+      const inside=coordination&&state.interior;
+      interiorMix+=(Number(inside)-interiorMix)*(reduce.matches?1:1-Math.exp(-dt*3.2));
+      site.visible=interiorMix<.9;
+      const structureFactor=inside?.65:.26;
       const architectureFactor=.07;
-      const electricalFactor=state.discipline==='electrical'?1:0;
+      const electricalFactor=state.discipline==='electrical'||coordination?1:0;
       for(const level of levels){
         const f=level.floor;
         const growth=state.lod===200&&state.playing&&!reduce.matches?ease((stageAge-f*.13)/.85):1;
-        level.group.visible=state.lod>=200&&growth>.001;
+        level.group.visible=state.lod>=200&&growth>.001&&(interiorMix<.9||f===2);
         level.group.position.set(Math.sin(f*1.25)*currentSpread*1.25,4.4+f*(5+currentSpread*2.2),Math.cos(f*1.25)*currentSpread*.6);
         level.group.scale.y=.015+growth*.985;
         level.frameMat.opacity=.57*structureFactor;
@@ -234,8 +239,9 @@ const portfolioBuilding3D = (() => {
         const facadeReveal=state.lod===300&&state.playing&&!reduce.matches?ease(stageAge/.8):1;
         level.facadeMat.opacity=(state.lod>=350?.34:.42)*architectureFactor*facadeReveal;
         level.glassMat.opacity=(state.lod>=350?.018:.045)*architectureFactor*facadeReveal;
-        level.mep.visible=state.lod>=300&&state.discipline==='electrical';
-        level.mechanical.visible=state.lod>=300&&state.discipline==='mechanical';
+        level.mep.visible=state.lod>=300&&(state.discipline==='electrical'||coordination);
+        level.mechanical.visible=state.lod>=300&&(state.discipline==='mechanical'||coordination);
+        level.ductEdge.color.setHex(coordination?0xdddddd:0xe31e24);
         const mechGrowth=state.lod===300&&state.playing&&!reduce.matches?ease((stageAge-f*.12)/1.1):1;
         level.mechanical.scale.set(Math.max(.001,mechGrowth),1,Math.max(.001,mechGrowth));
         level.sheet.visible=state.lod===400;
@@ -256,7 +262,7 @@ const portfolioBuilding3D = (() => {
         tray.group.visible=state.lod>=350;
         tray.center.geometry.attributes.position.setX(1,tray.length*draw);tray.center.geometry.attributes.position.needsUpdate=true;
         tray.centerMaterial.opacity=.8*electricalFactor;
-        tray.formed.visible=state.lod>=400&&form>.001;
+        tray.formed.visible=state.lod>=350&&form>.001;
         tray.formed.scale.set(1,Math.max(.01,form),1);
         const selected=state.selected===tray.id;
         tray.material.color.setHex(selected?0xffffff:0xe31e24);
@@ -271,7 +277,7 @@ const portfolioBuilding3D = (() => {
         light.route.geometry.setDrawRange(0,Math.floor(light.route.geometry.attributes.position.count*clamp(progress/.55)));
         const form=ease((progress-.45)/.55);
         light.fitting.visible=form>.001;light.fitting.scale.setScalar(Math.max(.001,form));
-        light.tube.visible=state.lod>=400;
+        light.tube.visible=state.lod>=400||coordination;
         light.route.material.opacity=.7*electricalFactor;light.tube.material.opacity=.75*electricalFactor;
         const selected=state.selected===light.id;
         light.edge.color.setHex(selected?0xe31e24:0xcccccc);
@@ -289,8 +295,20 @@ const portfolioBuilding3D = (() => {
       pointMaterial.opacity=.56+(state.playing&&!reduce.matches?Math.sin(phase*.35)*.04:0);
       const distance=(87+18*currentSpread)*(width<440?1.09:1);
       const yaw=currentAngle*Math.PI/180,elevation=state.lod===400?.52:width<440?.18:.21;
-      camera.position.set(Math.sin(yaw)*distance,currentTarget+distance*elevation,Math.cos(yaw)*distance);
-      camera.lookAt(0,currentTarget,0);camera.updateMatrixWorld();
+      // Walk beneath the Level 03 service zone while keeping both disciplines visible.
+      building.updateMatrixWorld(true);
+      const floor=levels[2];
+      const walk=state.playing&&!reduce.matches?Math.sin(stageAge*.28):0;
+      const innerPosition=new T.Vector3(-floor.w*.34+walk*.9,1.9,floor.d*.39).applyMatrix4(floor.group.matrixWorld);
+      const lookOffset=Math.sin((currentAngle-34)*Math.PI/180)*2;
+      const innerTarget=new T.Vector3(lookOffset,3.95,-floor.d*.18).applyMatrix4(floor.group.matrixWorld);
+      const outerPosition=new T.Vector3(Math.sin(yaw)*distance,currentTarget+distance*elevation,Math.cos(yaw)*distance);
+      camera.position.copy(outerPosition.lerp(innerPosition,interiorMix));
+      const target=new T.Vector3(0,currentTarget,0).lerp(innerTarget,interiorMix);
+      camera.fov=34+interiorMix*32;camera.updateProjectionMatrix();
+      camera.lookAt(target);camera.updateMatrixWorld();
+      container.dataset.cameraView=inside?'interior':'exterior';
+      container.dataset.coordination=String(coordination);
       // Update matrices before raycasting or projecting tags after a package move.
       building.updateMatrixWorld(true);
       container.dataset.cameraAngle=((currentAngle%360+360)%360).toFixed(1);
